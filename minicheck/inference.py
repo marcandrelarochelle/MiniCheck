@@ -369,13 +369,16 @@ class LLMCheck:
         """probs from vllm inference"""
         import math
         support_prob = 0
+        decoded_tokens = []
 
         for token_prob in response.outputs[0].logprobs[0].values():
             decoded_token = token_prob.decoded_token
             if decoded_token.lower() == 'yes': 
                 support_prob += math.exp(token_prob.logprob)
+
+            decoded_tokens.append(decoded_token)
         
-        return support_prob
+        return support_prob, decoded_tokens
 
 
     def get_all_chunks_per_doc(self, doc, claim):
@@ -437,15 +440,19 @@ class LLMCheck:
             all_prompts, 
             self.sampling_params,
         ) 
-        probs_per_chunk = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
+        probs_per_chunk, decoded_tokens_list_per_chunk = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
 
         result_dict = {}
-        for index, prob_per_chunk in zip(doc_claim_indices, probs_per_chunk):
+        decoded_tokens_dict = {}
+        for index, prob_per_chunk, decoded_tokens_per_chunk in zip(doc_claim_indices, probs_per_chunk, decoded_tokens_list_per_chunk):
             if index not in result_dict:
                 result_dict[index] = []
+                decoded_tokens_dict[index] = []
             result_dict[index].append(prob_per_chunk)
+            decoded_tokens_dict[index].extend(decoded_tokens_per_chunk)
 
-        probs_per_doc_claim_pair = [result_dict[index] for index in range(len(docs))] 
+        probs_per_doc_claim_pair = [result_dict[index] for index in range(len(docs))]
+        decoded_chunks_per_doc = [decoded_tokens_dict[index] for index in range(len(docs))]
         pred_label, max_support_prob, used_chunk, support_prob_per_chunk = [], [], [], []
         
         for idx in range(len(probs_per_doc_claim_pair)):
@@ -458,4 +465,4 @@ class LLMCheck:
             used_chunk.append(self.get_all_chunks_per_doc(doc, claim)['doc_chunks'])
             support_prob_per_chunk.append(probs_per_doc_claim_pair[idx])
         
-        return pred_label, max_support_prob, used_chunk, support_prob_per_chunk
+        return pred_label, max_support_prob, used_chunk, support_prob_per_chunk, decoded_chunks_per_doc
