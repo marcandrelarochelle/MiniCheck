@@ -68,8 +68,8 @@ class MiniCheck:
         future grounded fact-checking with much higher throughput and much lower latency.
         '''
 
-        assert model_name in ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B'], \
-            "model_name must be one of ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B']"
+        #assert model_name in ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B'], \
+        #    "model_name must be one of ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B']"
 
         
         if model_name in ['roberta-large', 'deberta-v3-large', 'flan-t5-large']:
