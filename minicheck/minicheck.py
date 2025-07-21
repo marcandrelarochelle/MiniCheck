@@ -79,7 +79,8 @@ class MiniCheck:
                 max_model_len=max_model_len,
                 cache_dir=cache_dir
             )
-        elif model_name == 'Bespoke-MiniCheck-7B':
+        #elif model_name == 'Bespoke-MiniCheck-7B':
+        else:
             self.model = LLMCheck(
                 model_id=model_name,
                 tensor_parallel_size=tensor_parallel_size,
