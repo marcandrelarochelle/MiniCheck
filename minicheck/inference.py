@@ -282,10 +282,10 @@ class LLMCheck:
 
         logging.info("Reminder: Please set the CUDA device before initializing the LLMCheck object.")
 
-        if model_id == 'Bespoke-MiniCheck-7B':
-            self.model_id = 'bespokelabs/Bespoke-MiniCheck-7B'
-        else:
-            raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
+        #if model_id == 'Bespoke-MiniCheck-7B':
+        #    self.model_id = 'bespokelabs/Bespoke-MiniCheck-7B'
+        #else:
+        #    raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
 
         self.tensor_parallel_size = tensor_parallel_size
         self.max_tokens = max_tokens
