@@ -440,16 +440,16 @@ class LLMCheck:
             all_prompts, 
             self.sampling_params,
         ) 
-        probs_per_chunk, decoded_tokens_list_per_chunk = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
+        results_per_chunk = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
 
         result_dict = {}
         decoded_tokens_dict = {}
-        for index, prob_per_chunk, decoded_tokens_per_chunk in zip(doc_claim_indices, probs_per_chunk, decoded_tokens_list_per_chunk):
+        for index, result_per_chunk in zip(doc_claim_indices, results_per_chunk):
             if index not in result_dict:
                 result_dict[index] = []
                 decoded_tokens_dict[index] = []
-            result_dict[index].append(prob_per_chunk)
-            decoded_tokens_dict[index].extend(decoded_tokens_per_chunk)
+            result_dict[index].append(result_per_chunk[0])
+            decoded_tokens_dict[index].extend(result_per_chunk[1])
 
         probs_per_doc_claim_pair = [result_dict[index] for index in range(len(docs))]
         decoded_chunks_per_doc = [decoded_tokens_dict[index] for index in range(len(docs))]
