@@ -373,7 +373,7 @@ class LLMCheck:
 
         for token_prob in response.outputs[0].logprobs[0].values():
             decoded_token = token_prob.decoded_token
-            if 'yes' in decoded_token.lower(): 
+            if decoded_token.lower() == 'yes': 
                 support_prob += math.exp(token_prob.logprob)
 
             decoded_tokens.append(decoded_token)
