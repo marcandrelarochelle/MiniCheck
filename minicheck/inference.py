@@ -382,7 +382,10 @@ class LLMCheck:
         start_response_index = 0
         
         if think and self.think_end_token is not None:
-            start_response_index = response.outputs[0].token_ids.index(self.think_end_token)
+            start_response_index = response.outputs[0].token_ids.index(self.think_end_token) if len(response.outputs[0].token_ids) > 1 else 0
+
+            if start_response_index == -1:
+                start_response_index = 0
 
         for token_prob in response.outputs[0].logprobs[start_response_index:].values():
             decoded_token = token_prob.decoded_token
