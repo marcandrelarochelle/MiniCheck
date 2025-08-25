@@ -329,10 +329,13 @@ class LLMCheck:
 
         self.tokenizer = self.llm.get_tokenizer()
         self.tokenizer.padding_side = "left"
-        terminators = [
-            self.tokenizer.eos_token_id,
-            self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
-        ]
+        
+        terminators = [self.tokenizer.eos_token_id]
+        converted_token = self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+        
+        if converted_token is not None:
+            terminators.append(converted_token)
+        
         self.sampling_params = SamplingParams(
             temperature=0,
             max_tokens=self.max_tokens,
