@@ -6,7 +6,7 @@ import numpy as np
 
 
 class MiniCheck:
-    def __init__(self, model_name='Bespoke-MiniCheck-7B', max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False) -> None:
+    def __init__(self, model_name='Bespoke-MiniCheck-7B', max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, think_end_token=None) -> None:
 
         '''
         Parameters:
@@ -87,11 +87,12 @@ class MiniCheck:
                 max_tokens=max_tokens,
                 cache_dir=cache_dir,
                 enable_prefix_caching=enable_prefix_caching,
-                max_model_len=max_model_len
+                max_model_len=max_model_len,
+                think_end_token=think_end_token
             )
         
 
-    def score(self, docs: List[str], claims: List[str], chunk_size=None) -> List[float]:
+    def score(self, docs: List[str], claims: List[str], chunk_size=None, soft_match_token=True, think=False) -> List[float]:
         '''
         Parameters:
         -----------
@@ -121,7 +122,7 @@ class MiniCheck:
         if isinstance(self.model, Inferencer):
             return self._score_inferencer(docs, claims, chunk_size)
         elif isinstance(self.model, LLMCheck):
-            return self._score_llmcheck(docs, claims, chunk_size)
+            return self._score_llmcheck(docs, claims, chunk_size, soft_match_token, think)
 
     
     def _score_inferencer(self, docs, claims, chunk_size):
@@ -136,5 +137,5 @@ class MiniCheck:
 
         return pred_label, max_support_prob, used_chunk, support_prob_per_chunk
     
-    def _score_llmcheck(self, docs, claims, chunk_size):
-        return self.model.score(docs, claims, chunk_size)
+    def _score_llmcheck(self, docs, claims, chunk_size, soft_match_token, think):
+        return self.model.score(docs, claims, chunk_size, soft_match_token, think)
