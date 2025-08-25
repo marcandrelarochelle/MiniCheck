@@ -268,7 +268,7 @@ class Inferencer():
 
 class LLMCheck:
 
-    def __init__(self, model_id, tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
+    def __init__(self, model_id, tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None, think_end_token=None):
         from vllm import LLM, SamplingParams
 
         import logging
@@ -329,6 +329,11 @@ class LLMCheck:
 
         self.tokenizer = self.llm.get_tokenizer()
         self.tokenizer.padding_side = "left"
+
+        if think_end_token is not None:
+            self.think_end_token = self.tokenizer.convert_tokens_to_ids(think_end_token)
+        else:
+            self.think_end_token = None
         
         terminators = [self.tokenizer.eos_token_id]
         converted_token = self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
@@ -356,27 +361,34 @@ class LLMCheck:
         return tokenized_text[:-1] 
     
 
-    def apply_chat_template(self, doc, claim):
+    def apply_chat_template(self, doc, claim, think):
 
         user_prompt = self.user_prompt.replace("[DOCUMENT]", doc).replace("[CLAIM]", claim)
         message = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False)
+        text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, think=think)
 
         return text
 
     
-    def get_support_prob(self, response):
+    def get_support_prob(self, response, soft_match_token, think):
         """probs from vllm inference"""
         import math
         support_prob = 0
         decoded_tokens = []
 
-        for token_prob in response.outputs[0].logprobs[0].values():
+        start_response_index = 0
+        
+        if think and self.think_end_token is not None:
+            start_response_index = response.outputs[0].token_ids.index(self.think_end_token)
+
+        for token_prob in response.outputs[0].logprobs[start_response_index:].values():
             decoded_token = token_prob.decoded_token
-            if decoded_token.lower() == 'yes': 
+            if not soft_match_token and decoded_token.lower() == 'yes': 
+                support_prob += math.exp(token_prob.logprob)
+            elif soft_match_token and 'yes' in decoded_token.lower():
                 support_prob += math.exp(token_prob.logprob)
 
             decoded_tokens.append(decoded_token)
@@ -420,7 +432,7 @@ class LLMCheck:
         return {'doc_chunks': doc_chunks, 'claim_repeat': claim_repeat}
 
 
-    def score(self, docs: List[str], claims: List[str], chunk_size=None) -> List[float]:
+    def score(self, docs: List[str], claims: List[str], chunk_size=None, soft_match_token=True, think=False) -> List[float]:
 
         self.doc_chunk_cache = {}
         self.chunk_size = chunk_size if chunk_size else self.default_chunk_size
@@ -435,7 +447,7 @@ class LLMCheck:
             doc_chunks = chunks['doc_chunks']
             claim_repeat = chunks['claim_repeat']
 
-            prompts = [self.apply_chat_template(doc_chunk, claim) for doc_chunk, claim in zip(doc_chunks, claim_repeat)]
+            prompts = [self.apply_chat_template(doc_chunk, claim, think) for doc_chunk, claim in zip(doc_chunks, claim_repeat)]
             all_prompts.extend(prompts)
             doc_claim_indices.extend([index] * len(prompts))
 
@@ -443,7 +455,7 @@ class LLMCheck:
             all_prompts, 
             self.sampling_params,
         ) 
-        results_per_chunk = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
+        results_per_chunk = [self.get_support_prob(responses[idx], soft_match_token, think) for idx in range(len(responses))]
 
         result_dict = {}
         decoded_tokens_dict = {}
