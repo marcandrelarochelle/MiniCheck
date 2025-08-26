@@ -268,7 +268,7 @@ class Inferencer():
 
 class LLMCheck:
 
-    def __init__(self, model_id, tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None, think_end_token=None):
+    def __init__(self, model_id, peft_path=None, tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None, think_end_token=None):
         from vllm import LLM, SamplingParams
 
         import logging
@@ -288,6 +288,7 @@ class LLMCheck:
         #    raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
 
         self.model_id = model_id
+        self.peft_path = peft_path
 
         self.tensor_parallel_size = tensor_parallel_size
         self.max_tokens = max_tokens
@@ -324,7 +325,8 @@ class LLMCheck:
             tensor_parallel_size=self.tensor_parallel_size,
             seed=2024,
             max_model_len=self.max_model_len,   # need to be adjusted based on the GPU memory available
-            enable_prefix_caching=self.enable_prefix_caching
+            enable_prefix_caching=self.enable_prefix_caching,
+            enable_lora=True if peft_path is not None else False
         )
 
         self.tokenizer = self.llm.get_tokenizer()
@@ -467,6 +469,7 @@ class LLMCheck:
         responses = self.llm.generate(
             all_prompts, 
             self.sampling_params,
+            lora_request=LoRARequest("lora_adapter", 1, self.peft_path) if self.peft_path else None
         ) 
         results_per_chunk = [self.get_support_prob(responses[idx], soft_match_token, think) for idx in range(len(responses))]
 
