@@ -384,14 +384,21 @@ class LLMCheck:
         if think and self.think_end_token is not None:
             try:
                 think_token_index = response.outputs[0].token_ids.index(self.think_end_token) + 1
+
+                decoded_token = next(iter(response.outputs[0].logprobs[think_token_index].values())).decoded_token
                 
+                while("\n" in decoded_token and think_token_index < len(response.outputs[0].token_ids) - 1):
+                    think_token_index += 1
+                    decoded_token = next(iter(response.outputs[0].logprobs[think_token_index].values())).decoded_token
+                    
                 if think_token_index < len(response.outputs[0].token_ids):
                     start_response_index = think_token_index
             except:
                 pass
 
-        for token_prob in response.outputs[0].logprobs[start_response_index:][0].values():
+        for token_prob in response.outputs[0].logprobs[start_response_index].values():
             decoded_token = token_prob.decoded_token
+            
             if not soft_match_token and decoded_token.lower() == 'yes': 
                 support_prob += math.exp(token_prob.logprob)
             elif soft_match_token and 'yes' in decoded_token.lower():
