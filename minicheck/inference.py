@@ -363,19 +363,19 @@ class LLMCheck:
         return tokenized_text[:-1] 
     
 
-    def apply_chat_template(self, doc, claim, think):
+    def apply_chat_template(self, doc, claim, enable_thinking):
 
         user_prompt = self.user_prompt.replace("[DOCUMENT]", doc).replace("[CLAIM]", claim)
         message = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, think=think)
+        text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, enable_thinking=enable_thinking)
 
         return text
 
     
-    def get_support_prob(self, response, soft_match_token, think):
+    def get_support_prob(self, response, soft_match_token, enable_thinking):
         """probs from vllm inference"""
         import math
         support_prob = 0
@@ -383,7 +383,7 @@ class LLMCheck:
 
         start_response_index = 0
         
-        if think and self.think_end_token is not None:
+        if enable_thinking and self.think_end_token is not None:
             try:
                 think_token_index = response.outputs[0].token_ids.index(self.think_end_token) + 1
 
@@ -447,7 +447,7 @@ class LLMCheck:
         return {'doc_chunks': doc_chunks, 'claim_repeat': claim_repeat}
 
 
-    def score(self, docs: List[str], claims: List[str], chunk_size=None, soft_match_token=True, think=False) -> List[float]:
+    def score(self, docs: List[str], claims: List[str], chunk_size=None, soft_match_token=True, enable_thinking=False) -> List[float]:
 
         self.doc_chunk_cache = {}
         self.chunk_size = chunk_size if chunk_size else self.default_chunk_size
@@ -462,7 +462,7 @@ class LLMCheck:
             doc_chunks = chunks['doc_chunks']
             claim_repeat = chunks['claim_repeat']
 
-            prompts = [self.apply_chat_template(doc_chunk, claim, think) for doc_chunk, claim in zip(doc_chunks, claim_repeat)]
+            prompts = [self.apply_chat_template(doc_chunk, claim, enable_thinking) for doc_chunk, claim in zip(doc_chunks, claim_repeat)]
             all_prompts.extend(prompts)
             doc_claim_indices.extend([index] * len(prompts))
 
