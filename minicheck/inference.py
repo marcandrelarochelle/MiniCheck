@@ -375,7 +375,7 @@ class LLMCheck:
         return text
 
     
-    def get_support_prob(self, response, soft_match_token, enable_thinking):
+    def get_support_prob(self, response, enable_thinking, soft_match_token):
         """probs from vllm inference"""
         import math
         support_prob = 0
@@ -471,7 +471,7 @@ class LLMCheck:
             self.sampling_params,
             lora_request=LoRARequest("lora_adapter", 1, self.peft_path) if self.peft_path else None
         ) 
-        results_per_chunk = [self.get_support_prob(responses[idx], soft_match_token, think) for idx in range(len(responses))]
+        results_per_chunk = [self.get_support_prob(responses[idx], enable_thinking, soft_match_token) for idx in range(len(responses))]
 
         result_dict = {}
         decoded_tokens_dict = {}
