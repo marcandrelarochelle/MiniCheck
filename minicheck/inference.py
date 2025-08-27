@@ -447,7 +447,7 @@ class LLMCheck:
         return {'doc_chunks': doc_chunks, 'claim_repeat': claim_repeat}
 
 
-    def score(self, docs: List[str], claims: List[str], chunk_size=None, soft_match_token=True, enable_thinking=False) -> List[float]:
+    def score(self, docs: List[str], claims: List[str], chunk_size=None, enable_thinking=False, soft_match_token=True) -> List[float]:
 
         self.doc_chunk_cache = {}
         self.chunk_size = chunk_size if chunk_size else self.default_chunk_size
