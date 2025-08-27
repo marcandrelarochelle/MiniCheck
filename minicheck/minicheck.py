@@ -93,7 +93,7 @@ class MiniCheck:
             )
         
 
-    def score(self, docs: List[str], claims: List[str], chunk_size=None, soft_match_token=True, think=False) -> List[float]:
+    def score(self, docs: List[str], claims: List[str], chunk_size=None, enable_thinking=False, soft_match_token=True) -> List[float]:
         '''
         Parameters:
         -----------
@@ -123,7 +123,7 @@ class MiniCheck:
         if isinstance(self.model, Inferencer):
             return self._score_inferencer(docs, claims, chunk_size)
         elif isinstance(self.model, LLMCheck):
-            return self._score_llmcheck(docs, claims, chunk_size, soft_match_token, think)
+            return self._score_llmcheck(docs, claims, chunk_size, enable_thinking, soft_match_token)
 
     
     def _score_inferencer(self, docs, claims, chunk_size):
