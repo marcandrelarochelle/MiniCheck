@@ -32,6 +32,8 @@ class MiniCheck:
                     Default: 32768
                 - 'Granite-Guardian-3.3-8B'
                     Default: 32768
+                - 'TBD'
+                    Default: 11468
             For 'Bespoke-MiniCheck-7B', if you have a GPU with low VRAM and get the following:
                 "ValueError: The model's max seq len (XXXX) is larger than the maximum number of 
                 tokens that can be stored in KV cache (YYYY). Try increasing `gpu_memory_utilization` 
@@ -104,6 +106,15 @@ class MiniCheck:
                 cache_dir=cache_dir,
                 enable_prefix_caching=enable_prefix_caching,
                 max_model_len=max_model_len
+            )
+        elif model_name == 'TBD':
+            self.model = LLMCheck(
+                model_id=model_name,
+                tensor_parallel_size=tensor_parallel_size,
+                max_tokens=max_tokens,
+                cache_dir=cache_dir,
+                enable_prefix_caching=enable_prefix_caching,
+                max_model_len=max_model_len,
             )
         
 

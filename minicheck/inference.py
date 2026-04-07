@@ -291,6 +291,10 @@ class LLMCheck:
         elif model_id == 'Granite-Guardian-3.3-8B':
             self.model_id = 'ibm-granite/granite-guardian-3.3-8b'
             self.operating_mode="gg_hybrid"
+        elif model_id == 'TBD':
+            self.model_id = 'TBD'
+            self.operating_mode="thinking"
+            self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
         else:
             raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
 
@@ -374,6 +378,13 @@ class LLMCheck:
             messages = [{"role": "assistant", "content": claim}]
             guardian_config = {"criteria_id": "groundedness"}
             text = self.tokenizer.apply_chat_template(messages, guardian_config = guardian_config, documents=documents, think=True, tokenize=False, add_generation_prompt=True)
+        elif self.operating_mode=="thinking":
+            user_prompt = self.user_prompt.replace("[DOCUMENT]", doc).replace("[CLAIM]", claim)
+            message = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, enable_thinking=True)
         return text
 
     
@@ -397,6 +408,33 @@ class LLMCheck:
         except Exception as e:
             print("Error:", e)
             support_prob = random.random()
+        return support_prob
+    
+    def get_support_prob_thinking(self, response):
+        """probs from vllm inference"""
+        import math
+        support_prob = 0
+
+        try:
+            thinking_token_index = response.outputs[0].token_ids.index(self.thinking_end_token) + 1
+
+            decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
+
+            while("\n" in decoded_token and thinking_token_index < len(response.outputs[0].token_ids) - 1):
+                thinking_token_index += 1
+                decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
+
+            if thinking_token_index < len(response.outputs[0].token_ids):
+                start_response_index = thinking_token_index
+        except Exception as e:
+            print("Error:", e)
+            support_prob = random.random()
+
+        for token_prob in response.outputs[0].logprobs[start_response_index].values():
+            decoded_token = token_prob.decoded_token
+            if decoded_token.lower() == 'yes': 
+                support_prob += math.exp(token_prob.logprob)
+        
         return support_prob
 
 
@@ -469,6 +507,8 @@ class LLMCheck:
             probs_per_chunk_sentence = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
         elif self.operating_mode=="gg_hybrid":
             probs_per_chunk_sentence = [self.get_support_prob_hybrid_gg(responses[idx]) for idx in range(len(responses))]
+        elif self.operating_mode=="thinking":
+            probs_per_chunk_sentence = [self.get_support_prob_thinking(responses[idx]) for idx in range(len(responses))]
 
         result_dict = {}
         for index, prob_per_chunk_sentence in zip(doc_claim_indices, probs_per_chunk_sentence):
