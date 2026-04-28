@@ -6,7 +6,7 @@ import numpy as np
 
 
 class MiniCheck:
-    def __init__(self, model_name='Bespoke-MiniCheck-7B', max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, bypass_model_check=False) -> None:
+    def __init__(self, model_name='Bespoke-MiniCheck-7B', operating_mode="bespoke", max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, bypass_model_check=False) -> None:
 
         '''
         Parameters:
@@ -119,6 +119,7 @@ class MiniCheck:
         else:
             self.model = LLMCheck(
                 model_id=model_name,
+                operating_mode=operating_mode,
                 tensor_parallel_size=tensor_parallel_size,
                 max_tokens=max_tokens,
                 cache_dir=cache_dir,
