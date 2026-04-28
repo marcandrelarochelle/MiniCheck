@@ -77,9 +77,6 @@ class MiniCheck:
         if not bypass_model_check:
             assert model_name in ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B', 'Granite-Guardian-3.3-8B'], \
                 "model_name must be one of ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B', 'Granite-Guardian-3.3-8B']"
-        else:
-            self._bypass_model_check = True
-
         
         if model_name in ['roberta-large', 'deberta-v3-large', 'flan-t5-large']:
             self.model = Inferencer(
@@ -176,4 +173,4 @@ class MiniCheck:
         return pred_label, max_support_prob, used_chunk, support_prob_per_chunk
     
     def _score_llmcheck(self, docs, claims, chunk_size):
-        return self.model.score(docs, claims, chunk_size, self._bypass_model_check)
+        return self.model.score(docs, claims, chunk_size)
