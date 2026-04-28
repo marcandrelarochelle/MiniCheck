@@ -271,7 +271,7 @@ class Inferencer():
 
 class LLMCheck:
 
-    def __init__(self, model_id, tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
+    def __init__(self, model_id, operating_mode="bespoke", tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
         from vllm import LLM, SamplingParams
 
         import logging
@@ -296,7 +296,12 @@ class LLMCheck:
             self.operating_mode="thinking"
             self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
         else:
-            raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
+            self.model_id = model_id
+            self.operating_mode=operating_mode
+
+            if operating_model == "thinking":
+                self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
+            #raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
 
         self.tensor_parallel_size = tensor_parallel_size
         self.max_tokens = max_tokens
