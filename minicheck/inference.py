@@ -299,10 +299,6 @@ class LLMCheck:
             self.model_id = model_id
             self.operating_mode=operating_mode
 
-            if operating_mode == "thinking":
-                self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
-            #raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
-
         self.peft_path = peft_path
 
         self.tensor_parallel_size = tensor_parallel_size
@@ -354,6 +350,9 @@ class LLMCheck:
         if converted_token is not None:
             terminators.append(converted_token)
 
+        if operating_mode == "thinking":
+            self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
+        
         self.sampling_params = SamplingParams(
             temperature=0,
             max_tokens=self.max_tokens,
