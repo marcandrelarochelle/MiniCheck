@@ -6,7 +6,7 @@ import numpy as np
 
 
 class MiniCheck:
-    def __init__(self, model_name='Bespoke-MiniCheck-7B', operating_mode="bespoke", max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, bypass_model_check=False) -> None:
+    def __init__(self, model_name='Bespoke-MiniCheck-7B', peft_path=None, max_lora_rank=16, operating_mode="bespoke", max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, bypass_model_check=False) -> None:
 
         '''
         Parameters:
@@ -19,6 +19,12 @@ class MiniCheck:
             - 'Bespoke-MiniCheck-7B'
             - 'Granite-Guardian-3.3-8B'
             Note: 'Bespoke-MiniCheck-7B' is the most performant fact-checking model in the MiniCheck series.
+
+        peft_path : str optional (default=None)
+            Path to the PEFT adapter
+
+        max_lora_rank : int optional (default=16)
+            Maximum LoRA Adapter Rank to load
         
         max_model_len : int or None, optional (default=None)
             The maximum input length for the model. If None, we use the following default values. 
@@ -119,6 +125,8 @@ class MiniCheck:
         else:
             self.model = LLMCheck(
                 model_id=model_name,
+                peft_path=peft_path,
+                max_lora_rank=max_lora_rank,
                 operating_mode=operating_mode,
                 tensor_parallel_size=tensor_parallel_size,
                 max_tokens=max_tokens,

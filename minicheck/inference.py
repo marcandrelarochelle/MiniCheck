@@ -271,7 +271,7 @@ class Inferencer():
 
 class LLMCheck:
 
-    def __init__(self, model_id, operating_mode="bespoke", tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
+    def __init__(self, model_id, peft_path=None, max_lora_rank=16, operating_mode="bespoke", tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
         from vllm import LLM, SamplingParams
 
         import logging
@@ -299,9 +299,11 @@ class LLMCheck:
             self.model_id = model_id
             self.operating_mode=operating_mode
 
-            if operating_model == "thinking":
+            if operating_mode == "thinking":
                 self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
             #raise ValueError("model_id must be 'Bespoke-MiniCheck-7B'")
+
+        self.peft_path = peft_path
 
         self.tensor_parallel_size = tensor_parallel_size
         self.max_tokens = max_tokens
@@ -338,7 +340,9 @@ class LLMCheck:
             tensor_parallel_size=self.tensor_parallel_size,
             seed=2024,
             max_model_len=self.max_model_len,   # need to be adjusted based on the GPU memory available
-            enable_prefix_caching=self.enable_prefix_caching
+            enable_prefix_caching=self.enable_prefix_caching,
+            max_lora_rank=max_lora_rank,
+            enable_lora=True if peft_path is not None else False
         )
 
         self.tokenizer = self.llm.get_tokenizer()
@@ -507,7 +511,19 @@ class LLMCheck:
             all_prompts.extend(prompts)
             doc_claim_indices.extend([index] * len(prompts))
 
-        responses = self.llm.generate(all_prompts, self.sampling_params) 
+        if self.peft_path is not None:
+            from vllm.lora.request import LoRARequest
+
+            responses = self.llm.generate(
+                all_prompts, 
+                self.sampling_params,
+                lora_request=LoRARequest("lora_adapter", 1, self.peft_path) if self.peft_path else None)
+        else:
+             responses = self.llm.generate(
+                all_prompts, 
+                self.sampling_params)
+
+
         if self.operating_mode=="bespoke":
             probs_per_chunk_sentence = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
         elif self.operating_mode=="gg_hybrid":
