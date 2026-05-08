@@ -422,6 +422,7 @@ class LLMCheck:
         """probs from vllm inference"""
         import math
         support_prob = 0
+        start_response_index = 0
 
         try:
             thinking_token_index = response.outputs[0].token_ids.index(self.thinking_end_token) + 1
