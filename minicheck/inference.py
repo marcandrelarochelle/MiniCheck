@@ -435,14 +435,14 @@ class LLMCheck:
 
             if thinking_token_index < len(response.outputs[0].token_ids):
                 start_response_index = thinking_token_index
+
+            for token_prob in response.outputs[0].logprobs[start_response_index].values():
+                decoded_token = token_prob.decoded_token
+                if decoded_token.lower() == 'yes': 
+                    support_prob += math.exp(token_prob.logprob)
         except Exception as e:
             print("Error:", e)
             support_prob = random.random()
-
-        for token_prob in response.outputs[0].logprobs[start_response_index].values():
-            decoded_token = token_prob.decoded_token
-            if decoded_token.lower() == 'yes': 
-                support_prob += math.exp(token_prob.logprob)
         
         return support_prob
 
