@@ -442,7 +442,11 @@ class LLMCheck:
                     support_prob += math.exp(token_prob.logprob)
         except Exception as e:
             print("Error:", e)
-            support_prob = random.random()
+            
+            for token_prob in response.outputs[0].logprobs[-1].values():
+                decoded_token = token_prob.decoded_token
+                if decoded_token.lower() == 'yes': 
+                    support_prob += math.exp(token_prob.logprob)
         
         return support_prob
 
