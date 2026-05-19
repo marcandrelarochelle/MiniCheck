@@ -301,7 +301,8 @@ class LLMCheck:
         else:
             self.model_id = model_id
             self.operating_mode=operating_mode
-            self.extra_chat_template_kwargs = extra_chat_template_kwargs
+
+            self.extra_chat_template_kwargs = extra_chat_template_kwargs if extra_chat_template_kwargs is not None else {}
 
             if operating_mode == "thinking":
                 self.thinking_end_token=self.tokenizer.convert_tokens_to_ids(think_end_token)
