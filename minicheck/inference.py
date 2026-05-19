@@ -304,9 +304,6 @@ class LLMCheck:
 
             self.extra_chat_template_kwargs = extra_chat_template_kwargs if extra_chat_template_kwargs is not None else {}
 
-            if operating_mode == "thinking":
-                self.thinking_end_token=self.tokenizer.convert_tokens_to_ids(think_end_token)
-
         self.peft_path = peft_path
 
         self.tensor_parallel_size = tensor_parallel_size
@@ -355,8 +352,12 @@ class LLMCheck:
             self.tokenizer.eos_token_id,
         ]
         converted_token = self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
+
         if converted_token is not None:
             terminators.append(converted_token)
+
+        if operating_mode == "thinking":
+            self.thinking_end_token=self.tokenizer.convert_tokens_to_ids(think_end_token)
         
         self.sampling_params = SamplingParams(
             temperature=0,
