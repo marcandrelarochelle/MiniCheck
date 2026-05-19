@@ -6,7 +6,7 @@ import numpy as np
 
 
 class MiniCheck:
-    def __init__(self, model_name='Bespoke-MiniCheck-7B', peft_path=None, max_lora_rank=16, operating_mode="bespoke", max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, bypass_model_check=False) -> None:
+    def __init__(self, model_name='Bespoke-MiniCheck-7B', peft_path=None, max_lora_rank=16, operating_mode="bespoke", think_end_token=None, extra_chat_template_kwargs=None, max_model_len=None, batch_size=16, cache_dir=None, tensor_parallel_size=1, max_tokens=1, enable_prefix_caching=False, bypass_model_check=False) -> None:
 
         '''
         Parameters:
@@ -20,11 +20,32 @@ class MiniCheck:
             - 'Granite-Guardian-3.3-8B'
             Note: 'Bespoke-MiniCheck-7B' is the most performant fact-checking model in the MiniCheck series.
 
-        peft_path : str optional (default=None)
-            Path to the PEFT adapter
+        peft_path : str, optional (default=None)
+            Path to the LLM PEFT adapter
+                - 'Bespoke-MiniCheck-7B'
+                    peft_path: None
+                - 'Granite-Guardian-3.3-8B'
+                    peft_path: None
 
-        max_lora_rank : int optional (default=16)
+        max_lora_rank : int, optional (default=16)
             Maximum LoRA Adapter Rank to load
+
+        operating_mode : str, optional (default='bespoke')
+            LLM model support probability operating mode
+            Preset models use their corresponding operating mode, i.e:
+                - 'Bespoke-MiniCheck-7B'
+                    Operating Mode: 'bespoke'
+                - 'Granite-Guardian-3.3-8B'
+                    Operating Mode: 'gg_hybrid'
+            Extra operating mode:
+                - 'thinking' uses the first logprobs after the thinking delimiter as support probability
+
+        think_end_token : str, optional (default=None)
+            Token used to represent the end of the thinking traces of LLM models
+
+        extra_chat_template_kwargs : dict, optional (default=None)
+            Extra kwargs to forward to the chat template
+            Preset models use their corresponding chat template kwargs
         
         max_model_len : int or None, optional (default=None)
             The maximum input length for the model. If None, we use the following default values. 
@@ -38,8 +59,6 @@ class MiniCheck:
                     Default: 32768
                 - 'Granite-Guardian-3.3-8B'
                     Default: 32768
-                - 'TBD'
-                    Default: 11468
             For 'Bespoke-MiniCheck-7B', if you have a GPU with low VRAM and get the following:
                 "ValueError: The model's max seq len (XXXX) is larger than the maximum number of 
                 tokens that can be stored in KV cache (YYYY). Try increasing `gpu_memory_utilization` 
@@ -65,6 +84,9 @@ class MiniCheck:
             Whether to enable prefix caching for 'Bespoke-MiniCheck-7B'. This can improve performance
             when using the same document chunk to fact-check different claims.
 
+        bypass_model_check: bool, optional (default=False)
+            Allows to bypass the model check to run the benchmark on different models with various configuration
+
         Note:
         (1) MiniCheck-Flan-T5-Large (770M) is the best fack-checking model with size < 1B and reaches GPT-4 performance.
         (2) Bespoke-MiniCheck-7B is the most performant fact-checking model in the MiniCheck series AND
@@ -85,6 +107,9 @@ class MiniCheck:
                 "model_name must be one of ['roberta-large', 'deberta-v3-large', 'flan-t5-large', 'Bespoke-MiniCheck-7B', 'Granite-Guardian-3.3-8B']"
         
         if model_name in ['roberta-large', 'deberta-v3-large', 'flan-t5-large']:
+            if operating_mode != 'operating_mode' or extra_chat_template_kwargs is not None or peft_path is not None or think_end_token is not None:
+                print(f"Forcing default preset configuration for model {model_name}")
+
             self.model = Inferencer(
                 model_name=model_name, 
                 batch_size=batch_size, 
@@ -92,6 +117,9 @@ class MiniCheck:
                 cache_dir=cache_dir
             )
         elif model_name == 'Bespoke-MiniCheck-7B':
+            if operating_mode != 'bespoke' or extra_chat_template_kwargs is not None or peft_path is not None or think_end_token is not None:
+                print("Forcing default preset configuration for model Bespoke-MiniCheck-7B")
+
             self.model = LLMCheck(
                 model_id=model_name,
                 tensor_parallel_size=tensor_parallel_size,
@@ -101,6 +129,9 @@ class MiniCheck:
                 max_model_len=max_model_len
             )
         elif model_name == 'Granite-Guardian-3.3-8B':
+            if operating_mode != 'gg_hybrid' or extra_chat_template_kwargs is not None or peft_path is not None or think_end_token is not None:
+                print("Forcing default preset configuration for model Granite Guardian 3.3")
+
             if not max_tokens or max_tokens<2048:
                 print("For Granite Guardian 3.3 - fixing the max_tokens to be 2048")
                 max_tokens=2048
@@ -113,26 +144,22 @@ class MiniCheck:
                 enable_prefix_caching=enable_prefix_caching,
                 max_model_len=max_model_len
             )
-        elif model_name == 'TBD':
-            self.model = LLMCheck(
-                model_id=model_name,
-                tensor_parallel_size=tensor_parallel_size,
-                max_tokens=max_tokens,
-                cache_dir=cache_dir,
-                enable_prefix_caching=enable_prefix_caching,
-                max_model_len=max_model_len,
-            )
         else:
+            if operating_mode == "thinking":
+                assert think_end_token is not None, "'thinking' operating mode requires to specify a 'think_end_token'"
+
             self.model = LLMCheck(
                 model_id=model_name,
                 peft_path=peft_path,
                 max_lora_rank=max_lora_rank,
                 operating_mode=operating_mode,
+                think_end_token=think_end_token,
+                extra_chat_template_kwargs=extra_chat_template_kwargs,
                 tensor_parallel_size=tensor_parallel_size,
                 max_tokens=max_tokens,
                 cache_dir=cache_dir,
                 enable_prefix_caching=enable_prefix_caching,
-                max_model_len=max_model_len,
+                max_model_len=max_model_len
             )
         
 

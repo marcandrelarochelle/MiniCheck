@@ -271,7 +271,7 @@ class Inferencer():
 
 class LLMCheck:
 
-    def __init__(self, model_id, peft_path=None, max_lora_rank=16, operating_mode="bespoke", tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
+    def __init__(self, model_id, peft_path=None, max_lora_rank=16, operating_mode="bespoke", think_end_token="</think>", extra_chat_template_kwargs=None, tensor_parallel_size=1, max_tokens=1, cache_dir=None, enable_prefix_caching=False, max_model_len=None):
         from vllm import LLM, SamplingParams
 
         import logging
@@ -291,15 +291,19 @@ class LLMCheck:
         elif model_id == 'Granite-Guardian-3.3-8B':
             self.model_id = 'ibm-granite/granite-guardian-3.3-8b'
             self.operating_mode="gg_hybrid"
-        elif model_id == 'TBD':
-            self.model_id = 'TBD'
-            self.operating_mode="thinking"
-            self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
+
+            self.extra_chat_template_kwargs = {
+                'guardian_config': {"criteria_id": "groundedness"},
+                'think': True
+            }
         else:
             self.model_id = model_id
             self.operating_mode=operating_mode
+            self.extra_chat_template_kwargs = extra_chat_template_kwargs
+            self.peft_path = peft_path
 
-        self.peft_path = peft_path
+            if operating_mode == "thinking":
+                self.thinking_end_token=self.tokenizer.convert_tokens_to_ids(think_end_token)
 
         self.tensor_parallel_size = tensor_parallel_size
         self.max_tokens = max_tokens
@@ -338,7 +342,7 @@ class LLMCheck:
             max_model_len=self.max_model_len,   # need to be adjusted based on the GPU memory available
             enable_prefix_caching=self.enable_prefix_caching,
             max_lora_rank=max_lora_rank,
-            enable_lora=True if peft_path is not None else False
+            enable_lora=True if self.peft_path is not None else False
         )
 
         self.tokenizer = self.llm.get_tokenizer()
@@ -349,9 +353,6 @@ class LLMCheck:
         converted_token = self.tokenizer.convert_tokens_to_ids("<|eot_id|>")
         if converted_token is not None:
             terminators.append(converted_token)
-
-        if operating_mode == "thinking":
-            self.thinking_end_token=self.tokenizer.convert_tokens_to_ids("</think>")
         
         self.sampling_params = SamplingParams(
             temperature=0,
@@ -380,19 +381,19 @@ class LLMCheck:
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
             ]
-            text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False)
+            text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, **self.extra_chat_template_kwargs)
         elif self.operating_mode=="gg_hybrid":
             documents = [{'doc_id':'0', 'text': doc}]
             messages = [{"role": "assistant", "content": claim}]
-            guardian_config = {"criteria_id": "groundedness"}
-            text = self.tokenizer.apply_chat_template(messages, guardian_config = guardian_config, documents=documents, think=True, tokenize=False, add_generation_prompt=True)
+            text = self.tokenizer.apply_chat_template(messages, documents=documents, add_generation_prompt=True, tokenize=False, **self.extra_chat_template_kwargs)
         elif self.operating_mode=="thinking":
             user_prompt = self.user_prompt.replace("[DOCUMENT]", doc).replace("[CLAIM]", claim)
             message = [
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": user_prompt},
             ]
-            text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, enable_thinking=True)
+            text = self.tokenizer.apply_chat_template(message, add_generation_prompt=True, tokenize=False, **self.extra_chat_template_kwargs)
+
         return text
 
     
@@ -422,32 +423,31 @@ class LLMCheck:
         """probs from vllm inference"""
         import math
         support_prob = 0
-        start_response_index = 0
+        start_response_index = -1
+
+        completion = response.outputs[0]
 
         try:
-            thinking_token_index = response.outputs[0].token_ids.index(self.thinking_end_token) + 1
+            if self.thinking_end_token in completion.token_ids:
+                thinking_token_index = completion.token_ids.index(self.thinking_end_token) + 1
 
-            decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
+                decoded_token = next(iter(completion.logprobs[thinking_token_index].values())).decoded_token
 
-            while("\n" in decoded_token and thinking_token_index < len(response.outputs[0].token_ids) - 1):
-                thinking_token_index += 1
-                decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
+                while("\n" in decoded_token and thinking_token_index < len(completion.token_ids) - 1):
+                    thinking_token_index += 1
+                    decoded_token = next(iter(completion.logprobs[thinking_token_index].values())).decoded_token
 
-            if thinking_token_index < len(response.outputs[0].token_ids):
-                start_response_index = thinking_token_index
+                if thinking_token_index < len(completion.token_ids):
+                    start_response_index = thinking_token_index
 
-            for token_prob in response.outputs[0].logprobs[start_response_index].values():
+            for token_prob in completion.logprobs[start_response_index].values():
                 decoded_token = token_prob.decoded_token
                 if decoded_token.lower() == 'yes': 
                     support_prob += math.exp(token_prob.logprob)
         except Exception as e:
             print("Error:", e)
+            support_prob = random.random()
             
-            for token_prob in response.outputs[0].logprobs[-1].values():
-                decoded_token = token_prob.decoded_token
-                if decoded_token.lower() == 'yes': 
-                    support_prob += math.exp(token_prob.logprob)
-        
         return support_prob
 
 
@@ -526,7 +526,6 @@ class LLMCheck:
              responses = self.llm.generate(
                 all_prompts, 
                 self.sampling_params)
-
 
         if self.operating_mode=="bespoke":
             probs_per_chunk_sentence = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
