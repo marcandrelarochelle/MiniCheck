@@ -288,6 +288,8 @@ class LLMCheck:
         if model_id == 'Bespoke-MiniCheck-7B':
             self.model_id = 'bespokelabs/Bespoke-MiniCheck-7B'
             self.operating_mode="bespoke"
+
+            self.extra_chat_template_kwargs = {}
         elif model_id == 'Granite-Guardian-3.3-8B':
             self.model_id = 'ibm-granite/granite-guardian-3.3-8b'
             self.operating_mode="gg_hybrid"
