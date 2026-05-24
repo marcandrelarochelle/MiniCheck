@@ -425,15 +425,16 @@ class LLMCheck:
         start_response_index = 0
 
         try:
-            thinking_token_index = response.outputs[0].token_ids.index(self.thinking_end_token) + 1
-
+            max_token_index =  len(response.outputs[0].token_ids) - 1
+            
+            thinking_token_index = min(response.outputs[0].token_ids.index(self.thinking_end_token) + 1, max_token_index)
             decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
 
-            while("\n" in decoded_token and thinking_token_index < len(response.outputs[0].token_ids) - 1):
+            while("\n" in decoded_token and thinking_token_index < max_token_index:
                 thinking_token_index += 1
                 decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
 
-            if thinking_token_index < len(response.outputs[0].token_ids):
+            if thinking_token_index <= max_token_index:
                 start_response_index = thinking_token_index
 
             for token_prob in response.outputs[0].logprobs[start_response_index].values():
