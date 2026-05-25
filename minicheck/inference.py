@@ -430,7 +430,7 @@ class LLMCheck:
             thinking_token_index = min(response.outputs[0].token_ids.index(self.thinking_end_token) + 1, max_token_index)
             decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
 
-            while("\n" in decoded_token and thinking_token_index < max_token_index:
+            while("\n" in decoded_token and thinking_token_index < max_token_index):
                 thinking_token_index += 1
                 decoded_token = next(iter(response.outputs[0].logprobs[thinking_token_index].values())).decoded_token
 
