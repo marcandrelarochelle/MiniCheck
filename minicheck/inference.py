@@ -434,15 +434,16 @@ class LLMCheck:
 
         try:
             if self.thinking_end_token in completion.token_ids:
+                max_token_index =  len(completion.token_ids) - 1
                 thinking_token_index = completion.token_ids.index(self.thinking_end_token) + 1
 
                 decoded_token = next(iter(completion.logprobs[thinking_token_index].values())).decoded_token
 
-                while("\n" in decoded_token and thinking_token_index < len(completion.token_ids) - 1):
+                while("\n" in decoded_token and max_token_index):
                     thinking_token_index += 1
                     decoded_token = next(iter(completion.logprobs[thinking_token_index].values())).decoded_token
 
-                if thinking_token_index < len(completion.token_ids):
+                if thinking_token_index <= max_token_index:
                     start_response_index = thinking_token_index
 
             for token_prob in completion.logprobs[start_response_index].values():
