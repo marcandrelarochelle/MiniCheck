@@ -206,7 +206,7 @@ class MiniCheck:
         max_support_prob, used_chunk, support_prob_per_chunk = self.model.fact_check(docs, claims)
         pred_label = [1 if prob > 0.5 else 0 for prob in max_support_prob]
 
-        return pred_label, max_support_prob, used_chunk, support_prob_per_chunk
+        return pred_label, [0] * len(pred_label), [1] * len(pred_label), max_support_prob, used_chunk, support_prob_per_chunk
     
     def _score_llmcheck(self, docs, claims, chunk_size):
         return self.model.score(docs, claims, chunk_size)

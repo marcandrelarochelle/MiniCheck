@@ -405,29 +405,48 @@ class LLMCheck:
     def get_support_prob(self, response):
         """probs from vllm inference"""
         import math
-        support_prob = 0
+        positive_support_prob = 0
+        negative_support_prob = 0
+        other_support_prob = 0
 
         for token_prob in response.outputs[0].logprobs[0].values():
             decoded_token = token_prob.decoded_token
+
             if decoded_token.lower() == 'yes': 
-                support_prob += math.exp(token_prob.logprob)
-        
-        return support_prob
+                positive_support_prob += math.exp(token_prob.logprob)
+            elif decoded_token.lower() == 'no': 
+                negative_support_prob += math.exp(token_prob.logprob)
+            else:
+                other_support_prob += math.exp(token_prob.logprob)
+
+        return positive_support_prob, negative_support_prob, other_support_prob
     
     def get_support_prob_hybrid_gg(self, response, marker="score"):
         """probs from vllm inference"""
+        positive_support_prob = 0
+        negative_support_prob = 0
+        other_support_prob = 0
+
         response_text = response.outputs[0].text.lower()
         try:
-            support_prob=1.0 if f"<{marker}> no </{marker}>" in response_text else 0.0
+            if f"<{marker}> no </{marker}>" in response_text:
+                negative_support_prob=1.0
+            elif f"<{marker}> yes </{marker}>" in response_text:
+                positive_support_prob=1.0
+            else:
+                other_support_prob = 1.0
         except Exception as e:
             print("Error:", e)
-            support_prob = random.random()
-        return support_prob
+            other_support_prob = 1.0
+        return positive_support_prob, negative_support_prob, other_support_prob
     
     def get_support_prob_thinking(self, response):
         """probs from vllm inference"""
         import math
-        support_prob = 0
+        positive_support_prob = 0
+        negative_support_prob = 0
+        other_support_prob = 0
+
         start_response_index = -1
 
         completion = response.outputs[0]
@@ -448,13 +467,18 @@ class LLMCheck:
 
             for token_prob in completion.logprobs[start_response_index].values():
                 decoded_token = token_prob.decoded_token
+
                 if decoded_token.lower() == 'yes': 
-                    support_prob += math.exp(token_prob.logprob)
+                    positive_support_prob += math.exp(token_prob.logprob)
+                elif decoded_token.lower() == 'no': 
+                    negative_support_prob += math.exp(token_prob.logprob)
+                else:
+                    other_support_prob += math.exp(token_prob.logprob)
         except Exception as e:
             print("Error:", e)
-            support_prob = random.random()
+            other_support_prob = 1.0
             
-        return support_prob
+        return positive_support_prob, negative_support_prob, other_support_prob
 
 
     def get_all_chunks_per_doc(self, doc, claim):
@@ -534,20 +558,30 @@ class LLMCheck:
                 self.sampling_params)
 
         if self.operating_mode=="bespoke":
-            probs_per_chunk_sentence = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
+            tuple_probs_per_chunk_sentence = [self.get_support_prob(responses[idx]) for idx in range(len(responses))]
         elif self.operating_mode=="gg_hybrid":
-            probs_per_chunk_sentence = [self.get_support_prob_hybrid_gg(responses[idx]) for idx in range(len(responses))]
+            tuple_probs_per_chunk_sentence = [self.get_support_prob_hybrid_gg(responses[idx]) for idx in range(len(responses))]
         elif self.operating_mode=="thinking":
-            probs_per_chunk_sentence = [self.get_support_prob_thinking(responses[idx]) for idx in range(len(responses))]
+            tuple_probs_per_chunk_sentence = [self.get_support_prob_thinking(responses[idx]) for idx in range(len(responses))]
+
+        probs_per_chunk_sentence = [probs[0] for probs in tuple_probs_per_chunk_sentence]
+        response_lengths = [len(response.outputs[0].text) for response in responses]
+        errors_per_chunk_sentence = [1 if probs[0] + probs[1] == 0 else 0 for probs in tuple_probs_per_chunk_sentence]
 
         result_dict = {}
-        for index, prob_per_chunk_sentence in zip(doc_claim_indices, probs_per_chunk_sentence):
+        errors_dict = {}
+        response_lengths_dict = {}
+        for index, prob_per_chunk_sentence, error_count, response_length in zip(doc_claim_indices, probs_per_chunk_sentence, errors_per_chunk_sentence, response_lengths):
             if index not in result_dict:
                 result_dict[index] = []
             result_dict[index].append(prob_per_chunk_sentence)
+            errors_dict[index].append(error_count)
+            response_lengths_dict[index].append(response_length)
 
         probs_per_doc_claim_pair = [result_dict[index] for index in range(len(docs))] 
-        pred_label, max_support_prob, used_chunk, support_prob_per_chunk = [], [], [], []
+        error_per_doc_claim_pair = [errors_dict[index] for index in range(len(docs))]
+        response_lengths_per_doc_claim_pair = [response_lengths_dict[index] for index in range(len(docs))]
+        pred_label, errors_count_per_doc, max_support_prob, used_chunk, support_prob_per_chunk = [], [], [], [], []
 
         for idx in range(len(probs_per_doc_claim_pair)):
 
@@ -559,6 +593,7 @@ class LLMCheck:
             num_chunks = len(self.get_all_chunks_per_doc(doc, claim)['doc_chunks'])
             num_sentences = len(claim_sentences)
             prob_matrix = np.array(probs_per_doc_claim_pair[idx]).reshape(num_chunks, num_sentences)
+            num_errors = np.sum(error_per_doc_claim_pair[idx])
 
             # For each sentence, pick the maximum probability across all chunks
             max_prob_per_sentence = np.max(prob_matrix, axis=0)
@@ -570,8 +605,9 @@ class LLMCheck:
             max_support_prob.append(final_score)
             used_chunk.append(self.get_all_chunks_per_doc(doc, claim)['doc_chunks'])
             support_prob_per_chunk.append(prob_matrix)
+            errors_count_per_doc.append(num_errors)
 
-        return pred_label, max_support_prob, used_chunk, support_prob_per_chunk
+        return pred_label, errors_count_per_doc, response_lengths_per_doc_claim_pair, max_support_prob, used_chunk, support_prob_per_chunk
 
     def split_into_sentences(self, text: str) -> List[str]:
         return nltk.sent_tokenize(text)
