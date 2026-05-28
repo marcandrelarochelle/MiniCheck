@@ -565,7 +565,7 @@ class LLMCheck:
             tuple_probs_per_chunk_sentence = [self.get_support_prob_thinking(responses[idx]) for idx in range(len(responses))]
 
         probs_per_chunk_sentence = [probs[0] for probs in tuple_probs_per_chunk_sentence]
-        response_lengths = [len(response.outputs[0].text) for response in responses]
+        response_lengths = [len(response.outputs[0].token_ids) for response in responses]
         errors_per_chunk_sentence = [1 if probs[0] + probs[1] == 0 else 0 for probs in tuple_probs_per_chunk_sentence]
 
         result_dict = {}
@@ -576,7 +576,7 @@ class LLMCheck:
                 result_dict[index] = []
                 errors_dict[index] = []
                 response_lengths_dict[index] = []
-
+                
             result_dict[index].append(prob_per_chunk_sentence)
             errors_dict[index].append(error_count)
             response_lengths_dict[index].append(response_length)
