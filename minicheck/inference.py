@@ -1,5 +1,6 @@
 # Adapt code from https://github.com/yuh-zha/AlignScore/tree/main
 
+from collections import Counter
 from nltk.tokenize import sent_tokenize
 import numpy as np
 import torch
@@ -419,7 +420,7 @@ class LLMCheck:
             else:
                 other_support_prob += math.exp(token_prob.logprob)
 
-        return positive_support_prob, negative_support_prob, other_support_prob
+        return positive_support_prob, negative_support_prob, other_support_prob, "unexpected answer" if positive_support_prob + negative_support_prob == 0 else ""
     
     def get_support_prob_hybrid_gg(self, response, marker="score"):
         """probs from vllm inference"""
@@ -438,7 +439,7 @@ class LLMCheck:
         except Exception as e:
             print("Error:", e)
             other_support_prob = 1.0
-        return positive_support_prob, negative_support_prob, other_support_prob
+        return positive_support_prob, negative_support_prob, other_support_prob, "unexpected answer" if positive_support_prob + negative_support_prob == 0 else ""
     
     def get_support_prob_thinking(self, response):
         """probs from vllm inference"""
@@ -446,6 +447,7 @@ class LLMCheck:
         positive_support_prob = 0
         negative_support_prob = 0
         other_support_prob = 0
+        error_type = ""
 
         start_response_index = -1
 
@@ -464,6 +466,8 @@ class LLMCheck:
 
                 if thinking_token_index <= max_token_index:
                     start_response_index = thinking_token_index
+            else:
+                error_type = "unfinished thinking"
 
             for token_prob in completion.logprobs[start_response_index].values():
                 decoded_token = token_prob.decoded_token
@@ -478,7 +482,7 @@ class LLMCheck:
             print("Error:", e)
             other_support_prob = 1.0
             
-        return positive_support_prob, negative_support_prob, other_support_prob
+        return positive_support_prob, negative_support_prob, other_support_prob, "unexpected answer" if error_type == "" and positive_support_prob + negative_support_prob == 0 else error_type
 
 
     def get_all_chunks_per_doc(self, doc, claim):
@@ -566,25 +570,25 @@ class LLMCheck:
 
         probs_per_chunk_sentence = [probs[0] for probs in tuple_probs_per_chunk_sentence]
         response_lengths = [len(response.outputs[0].token_ids) for response in responses]
-        errors_per_chunk_sentence = [1 if probs[0] + probs[1] == 0 else 0 for probs in tuple_probs_per_chunk_sentence]
+        errors_per_chunk_sentence = [probs[-1] for probs in tuple_probs_per_chunk_sentence]
 
         result_dict = {}
         errors_dict = {}
-        response_lengths_dict = {}
-        for index, prob_per_chunk_sentence, error_count, response_length in zip(doc_claim_indices, probs_per_chunk_sentence, errors_per_chunk_sentence, response_lengths):
+        response_lengths_dict = Counter()
+        for index, prob_per_chunk_sentence, error, response_length in zip(doc_claim_indices, probs_per_chunk_sentence, errors_per_chunk_sentence, response_lengths):
             if index not in result_dict:
                 result_dict[index] = []
-                errors_dict[index] = []
+                errors_dict[index] = {}
                 response_lengths_dict[index] = []
                 
             result_dict[index].append(prob_per_chunk_sentence)
-            errors_dict[index].append(error_count)
+            errors_dict[index].update(error)
             response_lengths_dict[index].append(response_length)
 
         probs_per_doc_claim_pair = [result_dict[index] for index in range(len(docs))] 
         error_per_doc_claim_pair = [errors_dict[index] for index in range(len(docs))]
         response_lengths_per_doc_claim_pair = [response_lengths_dict[index] for index in range(len(docs))]
-        pred_label, errors_count_per_doc, max_support_prob, used_chunk, support_prob_per_chunk = [], [], [], [], []
+        pred_label, max_support_prob, used_chunk, support_prob_per_chunk = [], [], [], []
 
         for idx in range(len(probs_per_doc_claim_pair)):
 
@@ -596,7 +600,6 @@ class LLMCheck:
             num_chunks = len(self.get_all_chunks_per_doc(doc, claim)['doc_chunks'])
             num_sentences = len(claim_sentences)
             prob_matrix = np.array(probs_per_doc_claim_pair[idx]).reshape(num_chunks, num_sentences)
-            num_errors = np.sum(error_per_doc_claim_pair[idx])
 
             # For each sentence, pick the maximum probability across all chunks
             max_prob_per_sentence = np.max(prob_matrix, axis=0)
@@ -608,9 +611,8 @@ class LLMCheck:
             max_support_prob.append(final_score)
             used_chunk.append(self.get_all_chunks_per_doc(doc, claim)['doc_chunks'])
             support_prob_per_chunk.append(prob_matrix)
-            errors_count_per_doc.append(num_errors)
 
-        return pred_label, errors_count_per_doc, response_lengths_per_doc_claim_pair, max_support_prob, used_chunk, support_prob_per_chunk
+        return pred_label, error_per_doc_claim_pair, response_lengths_per_doc_claim_pair, max_support_prob, used_chunk, support_prob_per_chunk
 
     def split_into_sentences(self, text: str) -> List[str]:
         return nltk.sent_tokenize(text)
