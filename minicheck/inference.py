@@ -574,11 +574,11 @@ class LLMCheck:
 
         result_dict = {}
         errors_dict = {}
-        response_lengths_dict = Counter()
+        response_lengths_dict = {}
         for index, prob_per_chunk_sentence, error, response_length in zip(doc_claim_indices, probs_per_chunk_sentence, errors_per_chunk_sentence, response_lengths):
             if index not in result_dict:
                 result_dict[index] = []
-                errors_dict[index] = {}
+                errors_dict[index] = Counter()
                 response_lengths_dict[index] = []
                 
             result_dict[index].append(prob_per_chunk_sentence)
