@@ -582,7 +582,10 @@ class LLMCheck:
                 response_lengths_dict[index] = []
                 
             result_dict[index].append(prob_per_chunk_sentence)
-            errors_dict[index].update([error])
+
+            if error != "":
+                errors_dict[index].update([error])
+
             response_lengths_dict[index].append(response_length)
 
         probs_per_doc_claim_pair = [result_dict[index] for index in range(len(docs))] 
